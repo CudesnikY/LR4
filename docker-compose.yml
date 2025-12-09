@@ -1,0 +1,42 @@
+version: "3.9"
+services:
+  user_service:
+    
+    build: ./user_service
+    ports:
+      - "5001:5001"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: always
+
+  product_service:
+    
+    build: ./product_service
+    ports:
+      - "5002:5002"
+    depends_on:
+      - rabbitmq
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: always
+
+  order_service:
+    
+    build: ./order_service
+    ports:
+      - "5003:5003"
+    depends_on: 
+      - user_service
+      - product_service
+      - rabbitmq
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: always
+    command: >
+     sh -c "python db.py && python app.py & python outbox_worker.py & python saga_orchestrator.py"
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    
