@@ -23,7 +23,7 @@ products = {
 
 @app.route("/product/<product_id>")
 # Завдання 3: Захист
-@token_required(scope="read:products")
+@token_required()
 def get_product(product_id):
     return jsonify(products.get(product_id, {"error": "Not found"}))
 

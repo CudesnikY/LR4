@@ -78,5 +78,25 @@ def create_order():
     return jsonify({"status": "Order stored and event saved to outbox", "order_id": new_order_id})
 
 
+@app.route("/order/<int:order_id>", methods=["GET"])
+# Используем scope "write:orders", так как он уже есть в твоем токене (для упрощения)
+@token_required(scope="write:orders")
+def get_order(order_id):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Ищем заказ в базе данных по ID
+    cursor.execute("SELECT * FROM orders WHERE id = ?", (order_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        # Преобразуем строку БД в словарь
+        order = dict(row)
+        return jsonify(order)
+
+    return jsonify({"error": "Order not found"}), 404
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5003)

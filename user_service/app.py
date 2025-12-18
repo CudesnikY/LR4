@@ -12,7 +12,7 @@ users = {"1": {"id": "1", "name": "Andriy"}}
 
 @app.route("/user/<user_id>")
 # Завдання 3: Захист JWT та Scope [cite: 59, 60]
-@token_required(scope="read:users")
+@token_required()
 def get_user(user_id):
     return jsonify(users.get(user_id, {"error": "User not found"}))
 
