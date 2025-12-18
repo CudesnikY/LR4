@@ -3,10 +3,11 @@ import json
 import time
 import os
 from db import get_db
-from openai import OpenAI
+import google.generativeai as genai
 
-# Ініціалізація OpenAI
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+# Налаштування Gemini
+# Переконайтесь, що GEMINI_API_KEY є в змінних середовища або .env файлі
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 
 def setup_rabbitmq():
@@ -28,23 +29,26 @@ def setup_rabbitmq():
 
 
 def ai_validate_order(order_data):
-    """Запитуємо AI, чи виглядає замовлення підозрілим"""
+    """Запитуємо AI (Gemini), чи виглядає замовлення підозрілим"""
     try:
         prompt = f"""
         Ти - AI-фільтр для системи замовлень. Проаналізуй це замовлення:
-        {order_data}
+        {json.dumps(order_data)}
         
         Правила:
         1. Ціна (price) має бути > 0.
         2. Якщо ціна > 100, це "high_value".
         
-        Відповіж ТІЛЬКИ у форматі JSON: {{"status": "approve" | "reject", "reason": "..."}}
+        Відповіж ТІЛЬКИ у форматі JSON з полями: "status" ("approve" або "reject") та "reason".
         """
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
+
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
         )
-        return json.loads(response.choices[0].message.content)
+
+        return json.loads(response.text)
     except Exception as e:
         print(f"⚠️ AI Error: {e}")
         return {"status": "approve", "reason": "AI unavailable"}  # Fallback
@@ -72,7 +76,7 @@ while True:
             print(f" Рішення: {decision}")
 
             if decision.get("status") == "reject":
-                print(f" Замовлення відхилено AI: {decision['reason']}")
+                print(f" Замовлення відхилено AI: {decision.get('reason')}")
                 cursor.execute(
                     "UPDATE outbox SET status='rejected_by_ai' WHERE id=?", (event["id"],))
                 conn.commit()

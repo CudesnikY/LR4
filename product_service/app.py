@@ -5,7 +5,7 @@ import threading
 import os
 from flask import Flask, jsonify
 from flask_cors import CORS
-from openai import OpenAI
+import google.generativeai as genai
 from auth_middleware import token_required
 
 app = Flask(__name__)
@@ -13,7 +13,8 @@ app = Flask(__name__)
 # Завдання 2: CORS
 CORS(app, resources={r"/*": {"origins": "https://cad.kpi.ua"}})
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+# Налаштування Gemini
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 products = {
     "101": {"id": "101", "name": "3D Model Pack", "price": 10.0, "available": 5},
@@ -22,7 +23,6 @@ products = {
 
 
 @app.route("/product/<product_id>")
-# Завдання 3: Захист
 @token_required()
 def get_product(product_id):
     return jsonify(products.get(product_id, {"error": "Not found"}))
@@ -35,13 +35,11 @@ def ai_process_event(body):
     Напиши короткий, креативний лог дій для складу (1 речення).
     """
     try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-    except:
-        return "Оброблено стандартним алгоритмом."
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Оброблено стандартним алгоритмом (AI Error: {e})"
 
 
 def start_consumer():

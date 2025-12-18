@@ -1,18 +1,17 @@
 import time
 import json
 import random
-from openai import OpenAI
+import os
+import google.generativeai as genai
 
-client = OpenAI(api_key="AIzaSyCEzVNZbzynIeA3tD8JB6UmrpQTtpBPcY8")
-
-#  AI Agent Producer
-# Замість простого відправлення, він аналізує, чи варто відправляти подію
+# Вставте ваш ключ сюди або використовуйте os.environ
+genai.configure(api_key="ВАШ_КЛЮЧ_GEMINI")
 
 
 def ai_producer_decision(order_data):
     prompt = f"""
     Ти - AI Producer. Твоя ціль - перевірити замовлення на аномалії перед відправкою.
-    Дані: {order_data}
+    Дані: {json.dumps(order_data)}
     Правила: 
     1. Ціна не може бути 0 або менше.
     2. Назва продукту має бути адекватною.
@@ -20,14 +19,10 @@ def ai_producer_decision(order_data):
     Відповіж тільки JSON: {{"action": "send" | "discard", "reason": "..."}}
     """
 
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return json.loads(response.choices[0].message.content)
-
-#  AI Agent Consumer
-# Замість простого збереження, він вирішує, як обробити
+    model = genai.GenerativeModel(
+        'gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
+    response = model.generate_content(prompt)
+    return json.loads(response.text)
 
 
 def ai_consumer_decision(event_body):
@@ -42,11 +37,9 @@ def ai_consumer_decision(event_body):
     Відповіж коротким логом дій.
     """
 
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message.content
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    response = model.generate_content(prompt)
+    return response.text
 
 
 def run_simulation():
@@ -62,20 +55,26 @@ def run_simulation():
 
     for order in orders_to_process:
         print(f"\nАналiз замовлення {order['order_id']}...")
-        decision = ai_producer_decision(order)
-        print(f"🤖 Рішення Producer: {decision}")
+        try:
+            decision = ai_producer_decision(order)
+            print(f"🤖 Рішення Producer: {decision}")
 
-        if decision['action'] == 'send':
-            queue.append(order)
-            print(" Відправлено в чергу (RabbitMQ)")
-        else:
-            print(" Відкинуто")
+            if decision.get('action') == 'send':
+                queue.append(order)
+                print(" Відправлено в чергу (RabbitMQ)")
+            else:
+                print(" Відкинуто")
+        except Exception as e:
+            print(f"Помилка AI: {e}")
 
     print("\n---  AI Consumer починає роботу ---")
     for msg in queue:
         print(f"\nОтримано повідомлення: {msg}")
-        log = ai_consumer_decision(msg)
-        print(f"🤖 Дії Consumer: {log}")
+        try:
+            log = ai_consumer_decision(str(msg))
+            print(f"🤖 Дії Consumer: {log}")
+        except Exception as e:
+            print(f"Помилка AI: {e}")
 
 
 if __name__ == "__main__":
