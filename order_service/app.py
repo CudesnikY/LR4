@@ -1,23 +1,53 @@
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import requests
 import json
 from db import get_db, init_db
+from auth_middleware import token_required
 
 app = Flask(__name__)
 
+# Завдання 2: CORS
+CORS(app, resources={r"/*": {"origins": "https://cad.kpi.ua"}})
+
 
 @app.route("/order", methods=["POST"])
+# Завдання 3: Захист для запису даних
+@token_required(scope="write:orders")
 def create_order():
     data = request.json
 
-    # Отримуємо дані від інших сервісів
+    # --- ВАЖЛИВО: Отримуємо токен з поточного запиту ---
+    auth_header = request.headers.get("Authorization")
+    headers = {"Authorization": auth_header} if auth_header else {}
+
+    # Отримуємо дані від інших сервісів, ПЕРЕДАЮЧИ токен далі
     try:
-        user = requests.get(
-            f"http://user_service:5001/user/{data['user_id']}", timeout=5).json()
-        product = requests.get(
-            f"http://product_service:5002/product/{data['product_id']}", timeout=5).json()
+        # Додаємо headers=headers у запити
+        user_resp = requests.get(
+            f"http://user_service:5001/user/{data['user_id']}",
+            headers=headers,
+            timeout=5
+        )
+        product_resp = requests.get(
+            f"http://product_service:5002/product/{data['product_id']}",
+            headers=headers,
+            timeout=5
+        )
+
+        # Перевіряємо статус коди внутрішніх запитів
+        if user_resp.status_code != 200 or product_resp.status_code != 200:
+            return jsonify({
+                "error": "Failed to fetch details from dependent services",
+                "user_service_status": user_resp.status_code,
+                "product_service_status": product_resp.status_code
+            }), 400
+
+        user = user_resp.json()
+        product = product_resp.json()
+
     except Exception as e:
-        return jsonify({"error": "Failed to contact dependent services"}), 503
+        return jsonify({"error": f"Failed to contact dependent services: {str(e)}"}), 503
 
     order_data = {
         "user": user.get("name"),
@@ -35,7 +65,7 @@ def create_order():
     """, (order_data["user"], order_data["product_id"], order_data["product_name"], order_data["price"]))
 
     new_order_id = cursor.lastrowid
-    order_data['order_id'] = new_order_id  #
+    order_data['order_id'] = new_order_id
 
     cursor.execute("""
         INSERT INTO outbox (event_type, payload, order_id)

@@ -4,9 +4,15 @@ import json
 import threading
 import os
 from flask import Flask, jsonify
+from flask_cors import CORS
 from openai import OpenAI
+from auth_middleware import token_required
 
 app = Flask(__name__)
+
+# Завдання 2: CORS
+CORS(app, resources={r"/*": {"origins": "https://cad.kpi.ua"}})
+
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 products = {
@@ -16,6 +22,8 @@ products = {
 
 
 @app.route("/product/<product_id>")
+# Завдання 3: Захист
+@token_required(scope="read:products")
 def get_product(product_id):
     return jsonify(products.get(product_id, {"error": "Not found"}))
 
@@ -59,7 +67,7 @@ def start_consumer():
                 # --- AI PROCESSING ---
                 action_log = ai_process_event(body.decode())
                 print(f" AI Consumer Log: {action_log}")
-                # Тут ми підтверджуємо повідомлення, бо AI його "обробив"
+
                 ch.basic_ack(delivery_tag=method.delivery_tag)
                 # ---------------------
 
@@ -72,6 +80,7 @@ def start_consumer():
             time.sleep(5)
 
 
+# Запуск фонового споживача RabbitMQ
 threading.Thread(target=start_consumer, daemon=True).start()
 
 if __name__ == "__main__":
