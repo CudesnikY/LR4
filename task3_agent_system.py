@@ -3,7 +3,7 @@ import json
 import random
 from openai import OpenAI
 
-client = OpenAI(api_key="AIzaSyCEzVNZbzynIeA3tD8JB6UmrpQTtpBPcY8")
+
 
 #  AI Agent Producer
 # Замість простого відправлення, він аналізує, чи варто відправляти подію
