@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'microservices'
+    static_configs:
+      - targets: 
+        - 'user_service:5001'
+        - 'product_service:5002'
+        - 'order_service:5003'

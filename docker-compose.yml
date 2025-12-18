@@ -1,19 +1,26 @@
 version: "3.9"
 services:
-  # --- Існуючі сервіси (оновлені depends_on) ---
+  
   user_service:
     build: ./user_service
     environment:
       - PYTHONUNBUFFERED=1
+      - OTEL_SERVICE_NAME=user-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     restart: always
+    depends_on:
+      - jaeger
 
   product_service:
     build: ./product_service
     depends_on:
       - rabbitmq
+      - jaeger
     environment:
       - PYTHONUNBUFFERED=1
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OTEL_SERVICE_NAME=product-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     restart: always
 
   order_service:
@@ -22,9 +29,12 @@ services:
       - user_service
       - product_service
       - rabbitmq
+      - jaeger
     environment:
       - PYTHONUNBUFFERED=1
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OTEL_SERVICE_NAME=order-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     restart: always
     command: >
      sh -c "python db.py && python app.py & python outbox_worker.py & python saga_orchestrator.py"
@@ -73,6 +83,33 @@ services:
       POSTGRES_PASSWORD: password
     volumes:
       - auth_data:/var/lib/postgresql/data
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" #
+      - "4317:4317"
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_SECURE_COOKIE=false
 
 volumes:
   auth_data:
