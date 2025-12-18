@@ -7,7 +7,7 @@ from openai import OpenAI
 API_URL = "http://localhost:5003/order"
 PRODUCT_URL = "http://localhost:5002/product"
 # Вставте ваш ключ сюди
-client = OpenAI(api_key="AIzaSyCEzVNZbzynIeA3tD8JB6UmrpQTtpBPcY8")
+
 
 # --- Level 1: Guardrails (Token Expenditure) ---
 
