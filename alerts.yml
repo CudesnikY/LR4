@@ -1,0 +1,19 @@
+groups:
+  - name: order_alerts
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 10s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} down"
+      
+      - alert: HighErrorRate
+        # Якщо кількість статусів 500 зростає
+        expr: rate(flask_http_request_total{status=~"5.."}[1m]) > 0
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"

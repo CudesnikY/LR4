@@ -8,8 +8,8 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 import google.generativeai as genai
 from auth_middleware import token_required
-
-# --- Observability Imports ---
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+from opentelemetry import trace, context
 from prometheus_flask_exporter import PrometheusMetrics
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -94,10 +94,19 @@ def start_consumer():
             print("Product-Service connected to RabbitMQ!")
 
             def callback(ch, method, props, body):
-                print(f" [x] Received {body}")
-                log = ai_process_event(body.decode())
-                print(f" AI Consumer Log: {log}")
-                ch.basic_ack(delivery_tag=method.delivery_tag)
+                # --- EXTRACT CONTEXT ---
+                # Витягуємо TraceID з заголовків повідомлення
+                headers = props.headers or {}
+                ctx = TraceContextTextMapPropagator().extract(carrier=headers)
+
+                # Запускаємо span з отриманим контекстом
+                with tracer.start_as_current_span("process_order_message", context=ctx):
+                    print(f" [x] Received {body}")
+
+                    # Передаємо контекст далі в логіку (якщо потрібно)
+                    log = ai_process_event(body.decode())
+                    print(f" AI Consumer Log: {log}")
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
 
             channel.basic_consume(
                 queue='orders', on_message_callback=callback, auto_ack=False)
