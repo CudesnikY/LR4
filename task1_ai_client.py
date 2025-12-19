@@ -7,16 +7,14 @@ from google.api_core import retry
 # Налаштування
 API_URL = "http://localhost:5003/order"
 PRODUCT_URL = "http://localhost:5002/product"
-genai.configure(api_key="ВАШ_КЛЮЧ_GEMINI")
-
-# --- Інструменти (Tools) ---
+genai.configure(api_key="${GEMINI_API_KEY}")
 
 
 def get_product_info(product_id: str):
     """Перевірити наявність та ціну товару за ID (наприклад, '101' або '102')."""
     try:
         resp = requests.get(f"{PRODUCT_URL}/{product_id}")
-        return resp.json()  # Gemini підтримує повернення dict
+        return resp.json()
     except Exception as e:
         return {"error": str(e)}
 

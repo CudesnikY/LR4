@@ -5,7 +5,7 @@ import os
 import google.generativeai as genai
 
 # Вставте ваш ключ сюди або використовуйте os.environ
-genai.configure(api_key="ВАШ_КЛЮЧ_GEMINI")
+genai.configure(api_key="${GEMINI_API_KEY}")
 
 
 def ai_producer_decision(order_data):
